@@ -12,6 +12,10 @@ COLOR_ACTIVE = (151, 42, 73)
 COLOR_INACTIVE = (0, 0, 0)
 RECT_BOX = [950, 395, 100, 50]
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+PLAYER_COLORS = [(25, 25, 112), (60, 179, 113), (255, 69, 0), (255, 215, 0), (0, 255, 0), (0, 191, 255), (0, 0, 255), (255, 20, 147)]
+
+FPS = 60
+clock = pygame.time.Clock()
 
 class Participants:
     def __init__(self, screen):
@@ -192,21 +196,51 @@ class Game():
         pygame.init()
         pygame.font.init()
         pygame.display.set_caption("Snake and Ladder    ---deepspraj")
+        game_icon = pygame.image.load(os.path.join(BASE_DIR, 'resources/game_icon.png'))
+        pygame.display.set_icon(game_icon)
         self.game_canvas = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-        self.game_image = self.apple_block = pygame.image.load(os.path.join(BASE_DIR, 'resources/main_face_2_600x600.jpg')).convert()
+        self.game_image =  pygame.image.load(os.path.join(BASE_DIR, 'resources/main_board_600x600.png'))
         self.game_canvas.fill(BACKGROUND_COLOR)
         self.winner = "None"
         self.last_tile = 100
         self.participants = Participants(self.game_canvas)
         self.dice_face = 0
         self.current_playing_player = 0
+        self.animation_dict = {}
+        self.traverse_list = []
 
     def draw_board(self):
         self.game_canvas.fill(BACKGROUND_COLOR)
         self.game_canvas.blit(self.game_image, (50, 60))
 
+    def game_board_coordinates(self):
+        x_offset = 20
+        y_offset = 90
+
+        for i in range(99, -1, -1):
+            x_offset += 60
+            if (i // 10) % 2 == 0:
+                self.animation_dict[i-10+2*(10-(i%10))] = (x_offset, y_offset)
+            else:
+                self.animation_dict[i+1] = (x_offset, y_offset)
+
+            if i % 10 == 0:
+                y_offset += 60
+                x_offset = 20
+    
+    def game_animation(self):
+        for i in (self.traverse_list):
+            position = pygame.draw.circle(self.game_canvas, PLAYER_COLORS[self.current_playing_player], self.animation_dict[i], 13)
+            pygame.display.update()
+            sleep(0.6)
+
+        self.traverse_list.clear()
+        pygame.display.update()
+
+
     def play_game(self):
-        
+        self.game_board_coordinates()
+
         end_game = False
         previous_chance_over = False
 
@@ -223,30 +257,43 @@ class Game():
                         self.dice_face = Dice.dice_roller()
 
                         if self.dice_face <= (self.last_tile - self.participants.participant_score[self.current_playing_player]):
-                            self.participants.participant_score[self.current_playing_player] += self.dice_face
+                            start_point = self.participants.participant_score[self.current_playing_player]
                             
+                            self.participants.participant_score[self.current_playing_player] += self.dice_face
+
+                            end_point = self.participants.participant_score[self.current_playing_player]
+
+                            for i in range (start_point, end_point+1):
+                                self.traverse_list.append(i)
+
+                            self.game_animation()
 
                             self.game_statistics()
 
                             assistance = Ladders.ladder_positions(self.participants.participant_score[self.current_playing_player])
                             if assistance:
-                                ladder_status = pygame.font.SysFont('arial', 20).render(f'{self.participants.name_participant[self.current_playing_player]} was at {self.participants.participant_score[self.current_playing_player]} and took ladder now at {assistance}', False, COLOR_INACTIVE)
-                                self.game_canvas.blit(ladder_status, (800, 500, 500, 70))
-                                pygame.display.update()
+                                start_point = self.participants.participant_score[self.current_playing_player]
+                                end_point = assistance
+                                self.traverse_list.append(start_point)
+                                self.traverse_list.append(end_point)
+                                self.game_animation()
                                 self.participants.participant_score[self.current_playing_player] = assistance
-
 
                             assistance = Snakes.snake_positions(self.participants.participant_score[self.current_playing_player])
                             if assistance:
-                                snake_status = pygame.font.SysFont('arial', 20).render(f'{self.participants.name_participant[self.current_playing_player]} was at {self.participants.participant_score[self.current_playing_player]} and snake bite now at {assistance}', False, COLOR_INACTIVE)
-                                self.game_canvas.blit(snake_status, (800, 500, 500, 70))
-                                pygame.display.update()
+                                start_point = self.participants.participant_score[self.current_playing_player]
+                                end_point = assistance
+                                self.traverse_list.append(start_point)
+                                self.traverse_list.append(end_point)
+                                self.game_animation()
                                 self.participants.participant_score[self.current_playing_player] = assistance
 
                     elif event.key == pygame.K_ESCAPE:
                         exit()
 
                     previous_chance_over = True
+
+                    self.game_statistics()
 
                 for i in range (self.participants.num_of_participants):
                     if self.participants.participant_score[i] == 100:
@@ -259,12 +306,15 @@ class Game():
                     elif self.current_playing_player == self.participants.num_of_participants-1:
                         self.current_playing_player = 0
                     
-                    
                     previous_chance_over = False
 
                 if end_game:
                     break   
                 
+                pygame.display.flip()
+            
+            clock.tick(FPS)
+
     def game_statistics(self):
         self.game_canvas.fill(BACKGROUND_COLOR)
         self.draw_board()
@@ -288,8 +338,6 @@ class Game():
         sleep(5)
 
     def game_start(self):
-        self.current_playing_player = 0
-        end_game = False
 
         self.participants.num_participants()
 
